@@ -227,3 +227,15 @@ recall_test <- TP/(TP+FN)
 precision_test <- TP/(TP+FP)
 f1_score <- (2*precision_test*recall_test)/(recall_test+precision_test)
 
+
+tree_fit_4 <- rpart(formula = y~., 
+                    data = bank_test, 
+                    parms = list(loss = matrix(c(0,1,5,0),
+                                               nrow = 2)))
+loss_pred_test <- predict(object = tree_fit_4,
+                         newdata = bank_test,
+                         type = 'class')
+confusion_matrix_loss <- table(bank_test$y, loss_pred_test)
+
+calc_misclass_error(model = tree_fit_4,
+                    data_set = bank_test)
