@@ -1,6 +1,6 @@
 # training data for random forest
 library(randomForest)
-
+library(ggplot2)
 x1 <- runif(100)
 
 x2 <- runif(100)
@@ -45,7 +45,7 @@ y <- as.numeric(x1<x2)
 telabels <- as.factor(y)
 tedata <- cbind(tedata, telabels)
 tedata[,3] <- as.factor(tedata[,3])
-# plot(x1, x2, col = (y+1))
+plot(x1, x2, col = (y+1))
 
 
 # pred_1 <- predict(object = rf_model1, newdata = tedata, type = 'class')
@@ -164,7 +164,7 @@ y <- as.numeric(x1<0.5)
 telabels <- as.factor(y)
 tedata_2 <- cbind(tedata_2, telabels)
 tedata_2[,3] <- as.factor(tedata_2[,3])
-
+plot(x1, x2, col = (y+1))
 misclass_rates_2 <- c()
 missrates_1_case2 <- c()
 missrates_10_case2 <- c()
@@ -235,7 +235,7 @@ y <- as.numeric((x1<0.5 & x2<0.5)
 telabels <- as.factor(y)
 tedata_3 <- cbind(tedata_3, telabels)
 tedata_3[,3] <- as.factor(tedata_3[,3])
-
+plot(x1, x2, col = (y+1))
 misclass_rates_3 <- c()
 missrates_1_case3 <- c()
 missrates_10_case3 <- c()
@@ -266,6 +266,9 @@ plot(rf_model_3)
 new_misclass_df_case3 <- data.frame(Tree1_Misclass = missrates_1_case3,
                                     Tree10_Misclass = missrates_10_case3,
                                     Tree100_Misclass = missrates_100_case3)
+plot_case3 <- ggplot(new_misclass_df_case3)+
+  geom_line(aes(y = 1:1000, 
+                x = new_misclass_df_case3[,1]))
 
 row.names(new_misclass_df_case3) <- NULL
 plot(rf_model_3)
@@ -277,13 +280,14 @@ variance_tree1_case3 <- var(new_misclass_df_case3[,1])
 variance_tree2_case3 <- var(new_misclass_df_case3[,2])
 variance_tree3_case3 <- var(new_misclass_df_case3[,3])
 
-mean_var_df <- data.frame(matrix(ncol = 6, nrow = 3))
+mean_var_df <- data.frame(matrix(ncol = 7, nrow = 3))
 colnames(mean_var_df) <- c('Mean_Case1',
                            'Mean_Case2',
                            'Mean_Case3',
                            'Var_Case1',
                            'Var_Case2',
-                           'Var_Case3')
+                           'Var_Case3',
+                           'Num_Tree')
 rownames(mean_var_df) <- c('1Tree',
                            '10Tree',
                            '100Tree')
@@ -292,16 +296,45 @@ mean_var_df[1,] <- c(mean_tree1,
                      mean_tree1_case3, 
                      variance_tree1,
                      variance_tree1_case2,
-                     variance_tree1_case3)
+                     variance_tree1_case3,
+                     1)
 mean_var_df[2,] <- c(mean_tree2, 
                      mean_tree2_case2, 
                      mean_tree2_case3, 
                      variance_tree2,
                      variance_tree2_case2,
-                     variance_tree2_case3)
+                     variance_tree2_case3,
+                     10)
 mean_var_df[3,] <- c(mean_tree3, 
                        mean_tree3_case2, 
                        mean_tree3_case3, 
                        variance_tree3,
                        variance_tree3_case2,
-                       variance_tree3_case3)
+                       variance_tree3_case3,
+                     100)
+
+plot(c(1,10,100),y = mean_var_df[,1], 
+     type = 'b', 
+     ylim = c(0,.25), 
+     xlab = 'No. of Trees',
+     ylab = 'Mean Misclassification Error', 
+     main = 'No. of Trees vs. Misclassification Error for each Case')
+lines(c(1,10,100), y = mean_var_df[,2], type = 'b', col = 'blue')
+lines(c(1,10,100), y = mean_var_df[,3], type = 'b', col = 'red')
+legend(40, .25, legend=c("Case1", 
+                        "Case2", 
+                        'Case3'),
+       col=c('black',"blue", "red"), lty = rep(1,3))
+
+plot(c(1,10,100),y = mean_var_df[,4], 
+     type = 'b',
+     ylim = c(0, 0.015),
+     xlab = 'No. of Trees',
+     ylab = 'Mean Misclassification Error', 
+     main = 'No. of Trees vs. Misclassification Error for each Case')
+lines(c(1,10,100), y = mean_var_df[,5], type = 'b', col = 'blue')
+lines(c(1,10,100), y = mean_var_df[,6], type = 'b', col = 'red')
+legend(40, .25, legend=c("Case1", 
+                         "Case2", 
+                         'Case3'),
+       col=c('black',"blue", "red"), lty = rep(1,3))
