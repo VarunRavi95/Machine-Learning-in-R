@@ -226,16 +226,115 @@ accuracy_test <- (TP+TN)/(P+N)
 recall_test <- TP/(TP+FN)
 precision_test <- TP/(TP+FP)
 f1_score <- (2*precision_test*recall_test)/(recall_test+precision_test)
+TPR <- TP/P
 
+FPR <- FP/N
 
-tree_fit_4 <- rpart(formula = y~., 
-                    data = bank_test, 
-                    parms = list(loss = matrix(c(0,1,5,0),
-                                               nrow = 2)))
-loss_pred_test <- predict(object = tree_fit_4,
+# tree_fit_4 <- rpart(formula = y~., 
+#                     data = bank_test, 
+#                     parms = list(loss = matrix(c(0,1,5,0),
+#                                                nrow = 2)))
+# loss_pred_test <- predict(object = tree_fit_4,
+#                          newdata = bank_test,
+#                          type = 'class')
+# confusion_matrix_loss <- table(bank_test$y, loss_pred_test)
+# 
+# calc_misclass_error(model = tree_fit_4,
+#                     data_set = bank_test)
+
+opt_pred_test_loss <- predict(object = opt_tree_new,
                          newdata = bank_test,
-                         type = 'class')
-confusion_matrix_loss <- table(bank_test$y, loss_pred_test)
+                         type = 'vector')
 
-calc_misclass_error(model = tree_fit_4,
-                    data_set = bank_test)
+
+opt_pred_test_loss <- as.data.frame(opt_pred_test_loss)
+loss_df <- data.frame(matrix(ncol = 3, nrow = 0))
+colnames(loss_df) <- c('no_prob', 'yes_prob', 'new_pred')
+
+new_test_ds <- cbind(bank_test, as.data.frame(opt_pred_test_loss))
+
+true_labels <- new_test_ds[,16]
+new_pred <- c()
+
+for (i in 1:length(true_labels)) {
+  if (true_labels[i] == 'no' && ((new_test_ds$no[i]/new_test_ds$yes[i])>5)) {
+    new_pred <- rbind(new_pred, 'no')
+  }else{
+    new_pred <- rbind(new_pred, 'yes')
+  }
+}
+table(bank_test$y, new_pred)
+missclass(bank_test$y, new_pred)
+
+
+
+
+opt_tree_new_pi <- prune.tree(tree = tree_fit_3,
+                           best = optimal_leaves,method = 'misclass')
+
+opt_pred_test_pi <- as.data.frame(predict(object = opt_tree_new_pi,
+                                       newdata = bank_test,
+                                       type = 'vector'))
+new_pred_pi <- c()
+for (i in 1:nrow(opt_pred_test_pi)) {
+  if (true_labels[i] == 'yes' && opt_pred_test_pi$yes[i]>0.05) {
+    new_pred_pi <- rbind(new_pred_pi, 'yes')
+  }else{
+    new_pred_pi <- rbind(new_pred_pi, 'no')
+  }
+}
+table(bank_test$y, new_pred_pi)
+conf_matrix_pi <- table(bank_test$y, new_pred_pi)
+TN_pi <- conf_matrix_pi[1,1]
+TP_pi <- conf_matrix_pi[2,2]
+FP_pi <- conf_matrix_pi[1,2]
+FN_pi <- conf_matrix_pi[2,1]
+N_pi <- TN_pi + FP_pi
+P_pi <- TP_pi + FN_pi
+TPR_pi <- TP_pi/P_pi
+FPR_pi <- FP_pi/N_pi
+recall <- TP_pi/(TP_pi+FN_pi)
+precision <- TP_pi/(TP_pi+FP_pi)
+
+model_eval_df <- as.data.frame(matrix(ncol = 5, nrow = 0))
+colnames(model_eval_df) <- c('Pi_Vals','TPR', 'FPR', 'Precision', 'Recall')
+
+calc_pi_func <- function(pi_vals){
+  new_pred_pi <- c()
+  opt_pred_test_pi <- as.data.frame(predict(object = opt_tree_new_pi,
+                                            newdata = bank_test,
+                                            type = 'vector'))
+  for (i in 1:nrow(opt_pred_test_pi)) {
+    if (true_labels[i] == 'yes' && (opt_pred_test_pi$yes[i]>pi_vals)) {
+      new_pred_pi <- rbind(new_pred_pi, 'yes')
+    }else{
+      new_pred_pi <- rbind(new_pred_pi, 'no')
+    }
+  }
+  conf_matrix_pi <- table(bank_test$y, new_pred_pi)
+  TN_pi <- conf_matrix_pi[1,1]
+  TP_pi <- conf_matrix_pi[2,2]
+  FP_pi <- conf_matrix_pi[1,2]
+  FN_pi <- conf_matrix_pi[2,1]
+  N_pi <- TN_pi + FP_pi
+  P_pi <- TP_pi + FN_pi
+  TPR_pi <- TP_pi/P_pi
+  FPR_pi <- FP_pi/N_pi
+  recall <- TP_pi/(TP_pi+FN_pi)
+  precision <- TP_pi/(TP_pi+FP_pi)
+  model_eval_df <<- rbind(model_eval_df, data.frame('Pi_Vals' = pi_vals,
+                                                    'TPR' = TPR_pi,
+                                                   'FPR' = FPR_pi,
+                                                   'Precision' = precision,
+                                                   'Recall' = recall))
+  return(model_eval_df)
+}
+
+pi_val <- seq(0.05, 0.95, 0.05)
+
+for (i in 1:length(pi_val)) {
+  calc_pi <- calc_pi_func(pi_vals = pi_val[i])
+}  
+
+plot(x = seq(0.05, 0.95, 0.05), y = calc_pi$TPR, type = 'l')
+plot(x = calc_pi$Recall, y = calc_pi$Precision)
