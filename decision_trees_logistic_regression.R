@@ -257,7 +257,7 @@ true_labels <- new_test_ds[,16]
 new_pred <- c()
 
 for (i in 1:length(true_labels)) {
-  if (true_labels[i] == 'no' && ((new_test_ds$no[i]/new_test_ds$yes[i])>5)) {
+  if (((new_test_ds$no[i]/new_test_ds$yes[i])>5)) {
     new_pred <- rbind(new_pred, 'no')
   }else{
     new_pred <- rbind(new_pred, 'yes')
@@ -272,69 +272,88 @@ missclass(bank_test$y, new_pred)
 opt_tree_new_pi <- prune.tree(tree = tree_fit_3,
                            best = optimal_leaves,method = 'misclass')
 
-opt_pred_test_pi <- as.data.frame(predict(object = opt_tree_new_pi,
-                                       newdata = bank_test,
-                                       type = 'vector'))
-new_pred_pi <- c()
-for (i in 1:nrow(opt_pred_test_pi)) {
-  if (true_labels[i] == 'yes' && opt_pred_test_pi$yes[i]>0.05) {
-    new_pred_pi <- rbind(new_pred_pi, 'yes')
-  }else{
-    new_pred_pi <- rbind(new_pred_pi, 'no')
-  }
-}
-table(bank_test$y, new_pred_pi)
-conf_matrix_pi <- table(bank_test$y, new_pred_pi)
-TN_pi <- conf_matrix_pi[1,1]
-TP_pi <- conf_matrix_pi[2,2]
-FP_pi <- conf_matrix_pi[1,2]
-FN_pi <- conf_matrix_pi[2,1]
-N_pi <- TN_pi + FP_pi
-P_pi <- TP_pi + FN_pi
-TPR_pi <- TP_pi/P_pi
-FPR_pi <- FP_pi/N_pi
-recall <- TP_pi/(TP_pi+FN_pi)
-precision <- TP_pi/(TP_pi+FP_pi)
+log_model_pi <- glm(formula = y~., family = binomial, data = bank_train)
+
+# opt_pred_test_pi <- as.data.frame(prediction(opt_tree_new_pi,
+#                                        bank_test))
+library(ROCR)
+
+fit.perf = performance(opt_pred_test_pi,"tpr","fpr")
+# new_pred_pi <- c()
+# for (i in 1:nrow(opt_pred_test_pi)) {
+#   if (true_labels[i] == 'yes' && opt_pred_test_pi$yes[i]>0.05) {
+#     new_pred_pi <- rbind(new_pred_pi, 'yes')
+#   }else{
+#     new_pred_pi <- rbind(new_pred_pi, 'no')
+#   }
+# }
+
 
 model_eval_df <- as.data.frame(matrix(ncol = 5, nrow = 0))
 colnames(model_eval_df) <- c('Pi_Vals','TPR', 'FPR', 'Precision', 'Recall')
 
-calc_pi_func <- function(pi_vals){
+
+calc_pi_func <- function(model_pi, pi_vals){
   new_pred_pi <- c()
-  opt_pred_test_pi <- as.data.frame(predict(object = opt_tree_new_pi,
-                                            newdata = bank_test,
-                                            type = 'vector'))
-  for (i in 1:nrow(opt_pred_test_pi)) {
-    if (true_labels[i] == 'yes' && (opt_pred_test_pi$yes[i]>pi_vals)) {
-      new_pred_pi <- rbind(new_pred_pi, 'yes')
-    }else{
-      new_pred_pi <- rbind(new_pred_pi, 'no')
+  if (isTRUE(attr(x = model_pi, which = 'class') == 'tree')) {
+    opt_pred_test_pi <- as.data.frame(predict(object = model_pi,
+                                              newdata = bank_test))
+    for (i in 1:nrow(opt_pred_test_pi)) {
+      if ((opt_pred_test_pi$yes[i]>pi_vals)) {
+        new_pred_pi <- rbind(new_pred_pi, 'yes')
+      }else{
+        new_pred_pi <- rbind(new_pred_pi, 'no')
+      }
     }
+    conf_matrix_pi <- table(bank_test$y, new_pred_pi)
+    TN_pi <- conf_matrix_pi[1,1]
+    TP_pi <- conf_matrix_pi[2,2]
+    FP_pi <- conf_matrix_pi[1,2]
+    FN_pi <- conf_matrix_pi[2,1]
+    N_pi <- TN_pi + FP_pi
+    P_pi <- TP_pi + FN_pi
+    TPR_pi <- TP_pi/P_pi
+    FPR_pi <- FP_pi/N_pi
+    recall <- TP_pi/(TP_pi+FN_pi)
+    precision <- TP_pi/(TP_pi+FP_pi)
+    model_eval_df <<- rbind(model_eval_df, data.frame('Pi_Vals' = pi_vals,
+                                                      'TPR' = TPR_pi,
+                                                      'FPR' = FPR_pi,
+                                                      'Precision' = precision,
+                                                      'Recall' = recall))
+    
+  }else{
+    logistic_prob_test_pi <- predict(object = model_pi, bank_test)
+    logistic_pred_test_pi <- ifelse(logistic_prob_test_pi > pi_vals, 'yes', 'no')
+    conf_matrix_pi <- table(bank_test$y, logistic_pred_test_pi)
+    TN_pi <- conf_matrix_pi[1,1]
+    TP_pi <- conf_matrix_pi[2,2]
+    FP_pi <- conf_matrix_pi[1,2]
+    FN_pi <- conf_matrix_pi[2,1]
+    N_pi <- TN_pi + FP_pi
+    P_pi <- TP_pi + FN_pi
+    TPR_pi <- TP_pi/P_pi
+    FPR_pi <- FP_pi/N_pi
+    recall <- TP_pi/(TP_pi+FN_pi)
+    precision <- TP_pi/(TP_pi+FP_pi)
+    model_eval_df <<- rbind(model_eval_df, data.frame('Pi_Vals' = pi_vals,
+                                                      'TPR' = TPR_pi,
+                                                      'FPR' = FPR_pi,
+                                                      'Precision' = precision,
+                                                      'Recall' = recall))
   }
-  conf_matrix_pi <- table(bank_test$y, new_pred_pi)
-  TN_pi <- conf_matrix_pi[1,1]
-  TP_pi <- conf_matrix_pi[2,2]
-  FP_pi <- conf_matrix_pi[1,2]
-  FN_pi <- conf_matrix_pi[2,1]
-  N_pi <- TN_pi + FP_pi
-  P_pi <- TP_pi + FN_pi
-  TPR_pi <- TP_pi/P_pi
-  FPR_pi <- FP_pi/N_pi
-  recall <- TP_pi/(TP_pi+FN_pi)
-  precision <- TP_pi/(TP_pi+FP_pi)
-  model_eval_df <<- rbind(model_eval_df, data.frame('Pi_Vals' = pi_vals,
-                                                    'TPR' = TPR_pi,
-                                                   'FPR' = FPR_pi,
-                                                   'Precision' = precision,
-                                                   'Recall' = recall))
   return(model_eval_df)
 }
 
 pi_val <- seq(0.05, 0.95, 0.05)
 
 for (i in 1:length(pi_val)) {
-  calc_pi <- calc_pi_func(pi_vals = pi_val[i])
+  calc_pi <- calc_pi_func(model_pi = opt_tree_new_pi,pi_vals = pi_val[i])
 }  
 
-plot(x = seq(0.05, 0.95, 0.05), y = calc_pi$TPR, type = 'l')
-plot(x = calc_pi$Recall, y = calc_pi$Precision)
+
+
+plot(x = model_eval_df$FPR, y = model_eval_df$TPR, type = 'l', col = 'red')
+plot(x = model_eval_df$Recall, y = model_eval_df$Precision, type = 'l', col = 'blue')
+
+# Precision-recall curves and ROC curves are two commonly used tools for evaluating the performance of a binary classifier. Both precision-recall curves and ROC curves are useful for understanding how a classifier is performing, and each has its own strengths and weaknesses. In general, precision-recall curves are better suited for imbalanced classification tasks, where one class is much more prevalent than the other, while ROC curves are better suited for balanced classification tasks. This is because precision-recall curves focus on the true positive rate (i.e., the number of true positives divided by the number of all positive samples), while ROC curves focus on the false positive rate (i.e., the number of false positives divided by the number of all negative samples). Because of this, precision-recall curves are more sensitive to changes in the classifier's performance at the decision threshold, while ROC curves are more sensitive to the overall performance of the classifier. Ultimately, the choice of which curve to use depends on the specific characteristics of the classification task at hand.
